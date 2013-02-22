@@ -1,0 +1,18 @@
+minor corrections and new section on diff species required in vignette
+add figure(s) to vignette
+add rationale for TargetScan (Baek etc)
+ADD other TgtScan datasets and relevant fucntionality to load these
+add makeGeneSet function (and demo in vignette) - currently doing
+add overlaps metric function (and demo in vignette)
+add KS test capability (see JK project) (and demo in vignette)
+
+CHANGE INTERACTIONS FUNCTION SO IT DOESN'T REPLY ON ONE LIST ELEMENT TO GET SPECIES
+
+LATER
+add capability to use other metrics (get data, convert gene ids, run same algorithms and compare outcomes e.g. DianaMicroT ?Pictar, others?)
+convert to S3 / S4 i.e. OOP type functions
+Compare to CORNA Wu and Mick Watson (! - get related citations in pubmed), see also PMID:19933823, PMID:21125499 (useful review), Wang and Li, “Correlation of Expression Profiles Between microRNAs and mRNA Targets Using NCI-60 Data.”, PMID:22002038, PMID:19517021, PMID:19534746, PMID:19551154 (useful review), PMID:19208133 (time series ? useful for JK work), PMID:22144207, PMID:19295134, PMID:19250313, Using expression profiling data to identify human microRNA targets (Huang et al).
+
+
+Compare to CORNA (can't do cohort I don't think, but have to test), RmirR, GenMir++, and others useful from the list above.
+Filter mRNA by expression level - could this be another selection parameter (papers on mRNA level v miR supression, one from Bartel and one by Mukherji).

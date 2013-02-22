@@ -1,0 +1,13 @@
+Package: wCCS
+Type: Package
+Title: Prioritizing Micro-RNA Targets.
+Version: 0.3.5
+Date: 2012-07-27
+Depends: R (>= 2.10.0), GSEABase, pheatmap
+Suggests: PGSEA
+Author: Iain J Gallagher
+Maintainer: Iain J Gallagher <iaingallagher@gmail.com>
+Description: This package uses data from the TargetScan database (www.targetscan.org) to prioritise the predicted targeting of genes by a cohort of regulated miRNA. For each mRNA/miRNA interaction listed the TargetScan database provides a context score indicating the confidence in any particular interaction. Using information about miRNA abundance from e.g. a microarray or qPCR survey the wCCS package prioritises the mRNA targets of all selected miRNAs.
+License: GPL-3
+LazyLoad: yes
+

@@ -1,0 +1,3 @@
+This repository contains code for a R/bioC package being developed for the prioritisation of microRNA targets.
+Download the all code and R CMD build wCCS
+Then, on linux anyway, R CMD INSTALL wCCS-x.tar.gz
