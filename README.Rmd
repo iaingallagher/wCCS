@@ -124,6 +124,63 @@ write.table(priDowns$top, 'dataOut/topTargetsDOWN.txt', sep='\t', quote=F, row.n
 write.table(priDowns$bottom, 'dataOut/bottomTargetsDOWN.txt', sep='\t', quote=F, row.names=F)
 ```
 
+## Creating a geneset
+It might be useful to create a geneset from the potentially targeted mRNA. This can then be used in other bioconductor packages to examine expression data for coordinated mRNA changes in the set of genes predicted to be targeted by a specific miRNA. The `createGeneset` function takes one element of the named list from the `interactions` function and create a suitable `GeneSetCollection`. The creation of a geneset and potential use is illustrated here.
+
+```{r}
+geneSetEx <- createGeneSet(interactionsTest$upTgts)
+class(geneSetEx)
+```
+We illustrate the use of the geneset using the `romer` package from `limma`. 
+__READ UP ON ROMER AND CREATE EXAMPLE__
+We'll need the gene expression data included.
+
+```{r fromExpressionWorkNeedsAdapting}
+#romer GSEA with Broad Inst genesets
+# for romer i need:
+# iset: list of indices specifying the rows of ‘y’ in the gene sets. The list can be made by symbols2indices and the gene sets can be retrieved from the molecular signatures database in Broad Institute.
+# y the expression data
+# design: design matrix
+# contrast: contrast for which the test is required. Can be an integer specifying a column of ‘design’, or else a contrast vector of length equal to the number of columns of ‘design’.
+
+#get the symbols for the genes of interest
+symbols <- ALL$SYMBOL
+y <- exprs(rmaDataFiltered)[as.numeric(rownames(ALL)), ] #get expressionData for the DE genes in the order of symbols
+
+#check for official symbols
+symbolsOfficial <- alias2SymbolTable(symbols,species="Hs")
+
+#get the genesets
+load("/home/iain/Documents/Work/Results/GSEAData/human_c2.rdata") #load an object called Hs.gmtl.c2 (curated genesets)- used later
+#uncomment to load motif genesets
+#load("/home/iain/Documents/Work/Results/GSEAData/human_c3.rdata")#load an object called Hs.gmtl.c3 (motif genesets)
+
+#ok now set up the index of where these genes are in the genesets
+c2 = symbols2indices(Hs.gmtl.c2, symbols)#use Hs.gmtl.c3 for motif sets
+
+# use design & matrix defined in limma work above
+#contr <- contrast.matrix(fetal-adult, levels=design)
+
+test <- romer(c2, y, design=design, contrast=cont.matrix[,1], nrot=9999)#contrast=cont.matrix[,2] = hlc, contrast=cont.matrix[,3] = hESC
+
+#get up and down lists
+downInd <- which(test[,3] < 0.05)
+downSets<- test[downInd,]
+nrow(downSets)
+
+upInd<-which(test[,2] < 0.05)
+upSets<- test[upInd,]
+nrow(upSets)
+
+write.table(upSets, 'ups.txt', sep='\t', quote=F)
+write.table(downSets, 'downs.txt', sep='\t', quote=F)
+
+# pull genes DE in fetal cells that are in the sig gene sets
+sigSetsInd <- which(names(c2) %in% rownames(test))
+sigSets <- c2[sigSetsInd]
+
+```
+
 ## miRNA regulated in one direction only
 
 If you have data where the miRNA are all regulated in the same direction you can use the same code as that demonstrated above with some minor modifications. Initially we load the same data and then remove the down-regulated miRNA from the `mirs` object. We then proceed with the same analysis.
@@ -178,13 +235,13 @@ In order to use the package you need data from [TargetScan](www.targetscan.org).
 temp <- tempfile()
 download.file("http://www.targetscan.org/vert_50/vert_50_data_download/Conserved_Site_Context_Scores.txt.zip", temp)
 
-data <- read.table(unz(temp, "Conserved_Site_Context_Scores.txt"), header=TRUE, sep='\t')
+data <- read.table(unz(temp, "Conserved_Site_Context_Scores.txt"), header=TRUE, sep='\t', as.is=TRUE)
 unlink(temp)
 
 data <- subset(data, context_score!='NULL')
 data <- subset(data, select = c(Gene.ID, Gene.Symbol, miRNA, context_score))
-data$context_score <- droplevels(data$context_score)
-data$context_score <- as.numeric(levels(data$context_score))[data$context_score]
+data$Gene.ID <- as.character(data$Gene.ID)
+data$context_score <- as.numeric(data$context_score)
 TgtScanData <- data
 save(TgtScanData, file = paste(find.package('wCCS'), 'data', 'TgtScanData.rda', sep='/'), compress = 'xz')
 ```
