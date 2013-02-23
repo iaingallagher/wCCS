@@ -1,0 +1,191 @@
+wCCS
+=====
+
+Iain J Gallagher
+==================
+
+# Introduction
+The wCCS package is a collection of functions to integrate microRNA (miRNA) and mRNA expression profiles. It uses data from the [TargetScan](http://www.targetscan.org/) database. The algorithm was first used to prioritise microRNA targets (which were subsequently validated at protein level) in a large study of diabetic human muscle. wCCS can help the user decide which of the many potential miRNA targets in a system of interest might be candidates for mRNA or protein level validation. In addition downtream analysis using the results of the package in other Bioconductor packages can provide insight into biological processes and / or pathways which might be targeted by the regulated miRNAs..
+# Motivation
+MicroRNA (miRNA) are small (~23nt) RNA molecules that in recent years have been shown to be important in regulating the stability and/or translational efficiency of mRNA. MircoRNAs are thought to tune the translation of mRNA to protein thus providing a post-transcriptional level of control. MiRNA activity is, to a large extent, dictated by complimentarity between bases in the 3'UTR of mRNA and seed regions in the 5' end of the miRNA. However other features around the seed region also influence the effect. The functional seed regions are 6-8nt long and occur frequently enough that any given miRNA can have a multiplicity of predicted targets and any given mRNA may be subject to regulation by several miRNA. Thus the problem of predicting true targets of miRNA is difficult. Several computer algorithms have been developed that attempt to delineate the targets of miRNA but the results of these are often inconsistent and non-overlapping making biological interpretation dufficult.
+
+Much of the work examining miRNA activity has focused on the effects on one miRNA transfected into a cell line of interest. Resulting changes in mRNA or protein levels are then presented. In vivo however it is likely that regulated miRNA act as cohorts i.e. a set of miRNA are coordinately regulated and act to suppress or de-repress proteins involved in tissue or temporally specific pathways. wCCS is a method to interrogate the effect of a cohort of regulated miRNA. We use data from the [TargetScan](www.targetscan.org) database for two reasons; firstly [TargetScan](www.targetscan.org) provides a metric (the context score) that allows users to weight individual miRNA/mRNA interactions and secondly TargetScan has been shown to perform well compared to other methods. The method could however be used with any metric of miRNA/mRNA interactions and so other tools could easily be incorporated.
+
+# The wCCS Package
+## wCCS
+The wCCS package has three requirements:
+
+* a two-column dataframe of miRNA identifiers and fold changes
+* a dataframe genes of interest; the first column is Entrez Ids and the second column is the 
+* information from the TargetScan database
+
+## Structure of miRNA data required by wCCS
+
+Probe | FC
+-----|-----
+hsa-miR-210 | 1.35
+hsa-miR-29a | 2.14
+hsa-miR-133a | -1.6
+hsa-miR-451 | -2.6
+
+The miRNA and fold change dataframe can be created by reading in a file using e.g. the `read.table` function. This data should be a two column file with column headings __Probe__ and __FC__ containing the miRNA identifier and the fold-change (on the log2 scale) respectively as seen in the table above. The miRNA fold change information is used to calculate a metric for prioritisation of targets of up and down-regulated miRNAs. It is therefore essential that the scale of fold change for up and down-regulated miRNAs is the same. On a linear scale a 50% fold change up or down is represented by 1.5 and 0.5 respectively. These are not equidistant from zero. On the log2 scale however the same fold changes are represented as 1.5 and -1.5 and are equidistant from zero. The miRNA identifier should be in the same format as found in the [TargetScan](www.targetscan.org) database e.g. hsa-miR-451. The case is important and so hsa-mir-451 for example will not work.
+
+The gene list needs to be of a reasonable size; a list of genes expressed (but not necessarily differentially regulated) from a microarray experiment is a good example and this is what we routinely use. Gene and miRNA data in the right format is included in the package and can be accessed as seen below after the package has been loaded. The required data from [TargetScan](www.targetscan.org) is also included and it is simple to add updated data when the TargetScan database changes - see below. We also ask __R__ to create a directory to hold the data we will write out.
+
+```{r setup, eval=F, echo=TRUE}
+library(wCCS)
+dir.create('dataOut') # create a data for output
+data(TgtScanData)
+data(genes)
+data(mirs)
+# examine these objects
+head(genes)
+head(mirs)
+head(TgtScanData)
+```
+
+The `genes` and `mirs` data loaded are from a microarray study examining mRNA and miRNA expression in foetal liver progenitor cells (LPCs) and mature hepatocytes (Kung et al in prep).
+
+We can now examine the mRNA/miRNA interactions. The data included with the package are the Conserved Site and Context Scores from [TargetScan](www.targetscan.org). The miRNA/gene interactions in this dataset are conserved across several species. For this reason the Entrez gene identifiers used in this dataset are human, as are the gene symbols. This is fine for a study investigating human miRNA but might not be for studies in other species. TargetScan has data available for Mus musculus, Caenorhabditis elegans, Drosophila melanogaster and Danio rerio. If you wish to use data (conserved or otherwise) for one of these species it can be 'plugged' into the package.
+
+We first split the regulated miRNA into separate sets of up and down-regulated miRNA using the `upDown` function and then retrieve the genes targeted by both sets of miRNA using the `interactions` function. The deMirs object below is a named list and we use the names of each list element (`up` & `down`) to access the subset of data we want. Note that the *absolute* value of the fold change is returned for the down-regulated miRNAs.
+
+```{r interactions, eval=FALSE, echo=TRUE}
+# split the miRNA data
+deMirs <- upDown(mirs)
+
+# examine the object
+class(deMirs)
+head(deMirs$up)
+head(deMirs$down)
+
+# extract the genes these miRNAs are predicted to target
+interactionTest <- interactions(deMirs, TgtScanData, genes)
+head(interactionTest$upTgts)
+head(interactionTest$downTgts)
+```
+
+The output from this process is a named list with elements `upTgts` and `downTgts`. These contain the genes from the [TargetScan](www.targetscan.org) database interacting with the up regulated and down regulated miRNAs of interest respectively. Each element of the list contains the Entrez gene ID, the gene symbol, interacting miRNA and the [TargetScan](www.targetscan.org) context score for each of the predicted target genes.
+
+Many genes are targeted by more than one miRNA and any given miRNA can target many genes. The `geneCounts` function in the package allows us to extract for each gene the number of miRNA predicted to target that gene and for each miRNA the number of genes it is predicted to target. This data can be written out for later examination.
+
+```{r getCounts, eval=FALSE, echo=TRUE}
+countsTest <- geneCounts(interactionTest)
+write.table(countsTest$geneCounts, 'dataOut/hitsPerGene.txt', sep='\t', quote=FALSE)
+write.table(countsTest$mirCounts, 'dataOut/tgtsPerMir.txt', sep='\t', quote=FALSE)
+```
+
+wCCS uses the context score provided by the [TargetScan](www.targetscan.org) database to prioritise the miRNA targets. For each miRNA/mRNA interaction the context score is multiplied by the absolute value of the miRNA fold change. This gives rise to a 'weighted' context score (wCS). Since many mRNA can be targets of more than one miRNA we can gauge the cumulative predicted miRNA effect by summing the wCS for each individual gene giving rise to a weighted cumulative context score (wCCS). The `makeMetric` function in the package carries out this calculation for each gene of interest.
+
+```{r cumulMetric, eval=FALSE, echo=TRUE}
+upCumulMetric <- makeMetric(interactionTest$upTgts, deMirs$up) 
+downCumulMetric <- makeMetric(interactionTest$downTgts, deMirs$down) 
+head(upCumulMetric)
+head(downCumulMetric)
+```
+
+We can then visualise the distribution of the wCCS to examine the predicted impact of the up and down regulated miRNAs.
+
+```{r aFig, eval=FALSE, echo=TRUE}
+par(mfrow = c(1,2))
+hist(upCumulMetric[,3], xlab='wCCS', ylab='Freq', main='up wCCS Distribution', lwd=2, col='gray70')
+hist(downCumulMetric[,3], xlab='wCCS', ylab='Freq', main='down wCCS Distribution', lwd=2, col='gray70')
+```
+
+The promiscuous action of miRNA means that some of our genes of interest will be targeted by both up and down-regulated miRNA. The `getOverlaps` function in the package identifies these genes and then assigns a new wCCS based on whether the effect of the up or down-regulated miRNA is predicted to be greater and adds the mRNA to the predicted targets of either up or down-regulated miRNA as appropriate.
+
+```{r overlaps, eval=FALSE, echo=TRUE}
+cumulMetric <- getOverlaps(upCumulMetric, downCumulMetric)
+class(cumulMetric)
+head(cumulMetric$upTgts)
+head(cumulMetric$downTgts)
+```
+
+We can now identify those genes which are predicted to be most affected by the activity of the regulated miRNA. The `prioritiseTargets` function carries out this task. The default behaviour of this function is to output all data and the top (predicted to be strongly regulated by miRNA) and bottom (predicted to be weakly regulated by miRNA) quartiles but this behaviour can be altered by supplying a value to the `quant` argument. For example `quant = 0.1` would output the top and bottom 10%.
+
+```{r prioritiseTargets, eval=FALSE, echo=TRUE}
+ups <- cumulMetric$upTgts
+downs <- cumulMetric$downTgts
+
+priUps <- prioritiseTargets(ups)
+priDowns <- prioritiseTargets(downs)
+```
+
+Finally we write out the data for further analysis or records.
+
+```{r writeData, eval=FALSE, echo=TRUE}
+write.table(priUps$all, 'dataOut/allTargetsUP.txt', sep='\t', quote=F, row.names=F)
+write.table(priUps$top, 'dataOut/topTargetsUP.txt', sep='\t', quote=F, row.names=F)
+write.table(priUps$bottom, 'dataOut/bottomTargetsUP.txt', sep='\t', quote=F, row.names=F)
+
+
+write.table(priDowns$all, 'dataOut/allTargetsDOWN.txt', sep='\t', quote=F, row.names=F)
+write.table(priDowns$top, 'dataOut/topTargetsDOWN.txt', sep='\t', quote=F, row.names=F)
+write.table(priDowns$bottom, 'dataOut/bottomTargetsDOWN.txt', sep='\t', quote=F, row.names=F)
+```
+
+## miRNA regulated in one direction only
+
+If you have data where the miRNA are all regulated in the same direction you can use the same code as that demonstrated above with some minor modifications. Initially we load the same data and then remove the down-regulated miRNA from the `mirs` object. We then proceed with the same analysis.
+
+```{r upMirsOnly, eval=FALSE, echo=TRUE}
+data(TgtScanData)
+data(genes)
+data(mirs)
+dir.create('dataOut', showWarnings = FALSE)
+
+mirs <- mirs[which(mirs[,2] > 0),] # only up regulated miRNA
+deMirs <- upDown(mirs)
+interactionTest <- interactions(deMirs, TgtScanData, genes)
+countsTest <- geneCounts(interactionTest)
+upCumulMetric <- makeMetric(interactionTest$upTgts, deMirs$up) # only selecting up data
+priUps <- prioritiseTargets(upCumulMetric)
+write.table(priUps$all, 'dataOut/allTargetsUP.txt', sep='\t', quote=F, row.names=F)
+write.table(priUps$top, 'dataOut/topTargetsUP.txt', sep='\t', quote=F, row.names=F)
+write.table(priUps$bottom, 'dataOut/bottomTargetsUP.txt', sep='\t', quote=F, row.names=F)
+```
+
+Note that we don't use the `getOverlaps` function here since it makes no sense.
+
+# Bioinformatic Analysis
+We now have a list of genes which are the best and worst predicted targets of our regulated miRNA. One way to begin to interrogate these gene lists for biological relevance is to examine whether particular Gene Ontology or biological pathways are enriched in these genes. Here we examine enrichment in the best target predictions (i.e. the top quartile wCCS) compared to enrichement in the worst target predictions (i.e. the bottom quartile wCCS). Our prediction would be that there is more biological relevance in the best predictions than is seen in the worst predictions. Furthermore we use the entire list of genes we fed into wCCS as a background to deal with the problem of tissue or gene list specific ontological enrichment. We use the GOstats package to carry out this analysis. However the user is free to use other packages or methods. For further details on the commands below the reader is encouraged to see the GOstats documentation. We first combine the targets from both first quartile lists and the targets from both bottom quartile lists and then carry out the tests for GOBP category enrichment for each list of genes.
+
+```{r bioinformatics, eval=FALSE, echo=TRUE}
+library(GOstats)
+library(org.Hs.eg.db)
+
+universe <- as.character(genes[,1]) # the Entrez IDs of all expressed genes
+q1 <- c(priUps$top$egID, priDowns$top$egID) # the Entrez IDs of the q1 genes we are testing for GO enrichment
+q4 <- c(priUps$bottom$egID, priDowns$bottom$egID) # the Entrez IDs of the q4 genes we are testing for GO enrichment
+
+params <- new("KEGGHyperGParams", geneIds = q1, universeGeneIds = universe, annotation = "org.Hs.eg.db", pvalueCutoff = 0.1, testDirection = "over") 
+
+hgOverQ1 <- hyperGTest(params) # perform the test for q1 targets
+head(summary(hgOverQ1)) # examine results
+htmlReport(hgOverQ1, file = 'dataOut/upRegMirTargsGOReport_BP_Q1.html') # write results out
+
+params <- new("KEGGHyperGParams", geneIds = q4, universeGeneIds = universe, annotation = "org.Hs.eg.db", pvalueCutoff = 0.1, testDirection = "over") 
+
+hgOverQ4 <- hyperGTest(params) # perform the test for q4 targets
+head(summary(hgOverQ4)) # examine results
+htmlReport(hgOverQ4, file = 'dataOut/upRegMirTargsGOReport_BP_Q4.html') # write results out
+```
+
+# TargetScan Data
+In order to use the package you need data from [TargetScan](www.targetscan.org). This data is included in the package but you can download updated information if you prefer. Here, for consistency of interface we use R to download and process the data but you could manually download it, load it into R (or software of your choosing) and process it separately if you wanted to. The TargetScan data can be downloaded by ftp from the [TargetScan](www.targetscan.org) website. First we create a temporary file to hold the retrieved data, read the data into a dataframe and then delete the temporary file. Note that the dynamic nature of the web means that the address below is subject to change so it's worth checking before typing (or copying). The only columns from the TargetScan data currently required for wCCS to run are the Entrez Gene ID, the gene symbol, the miRNA identifier and the context score. Furthermore some of the context scores in the data are set to NULL so we remove these and set this to numeric (as opposed to a factor). After filtering we save the resulting object out for use by the wCCS functions. 
+
+```{r TgtScanData, eval=FALSE, echo=TRUE}
+temp <- tempfile()
+download.file("http://www.targetscan.org/vert_50/vert_50_data_download/Conserved_Site_Context_Scores.txt.zip", temp)
+
+data <- read.table(unz(temp, "Conserved_Site_Context_Scores.txt"), header=TRUE, sep='\t')
+unlink(temp)
+
+data <- subset(data, context_score!='NULL')
+data <- subset(data, select = c(Gene.ID, Gene.Symbol, miRNA, context_score))
+data$context_score <- droplevels(data$context_score)
+data$context_score <- as.numeric(levels(data$context_score))[data$context_score]
+TgtScanData <- data
+save(TgtScanData, file = paste(find.package('wCCS'), 'data', 'TgtScanData.rda', sep='/'), compress = 'xz')
+```
+The best place to save this data is in the `data` directory of the package and this is what the final save command above does. To do this the wCCS package need not be loaded but it must be installed. 
